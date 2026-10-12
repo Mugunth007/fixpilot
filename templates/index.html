@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FixPilot — Autonomous Self-Healing SRE</title>
+    <!-- Fonts: Plus Jakarta Sans & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        darkBg: '#030712',
+                        cardBg: 'rgba(9, 14, 26, 0.75)',
+                        borderCol: 'rgba(255, 255, 255, 0.08)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #030712;
+            color: #f1f5f9;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+            background-size: 28px 28px;
+        }
+        .tab-btn {
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .tab-btn.active {
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+        pre, code {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom sleek scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 relative selection:bg-blue-500/30 selection:text-blue-200">
+
+    <!-- Aceternity Spotlight / Aura Glowing Background Effect -->
+    <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[480px] bg-gradient-to-tr from-blue-600/20 via-indigo-600/20 to-purple-600/15 blur-[140px] -z-10 pointer-events-none rounded-full"></div>
+    <div class="fixed top-[35%] right-[5%] w-[500px] h-[500px] bg-gradient-to-b from-cyan-600/10 to-transparent blur-[160px] -z-10 pointer-events-none rounded-full"></div>
+
+    <!-- Header Section -->
+    <header class="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between pb-6 border-b border-white/[0.08] gap-4">
+        <div>
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 p-[1px] shadow-lg shadow-blue-500/20">
+                    <div class="w-full h-full bg-zinc-950 rounded-[11px] flex items-center justify-center">
+                        <i class="fa-solid fa-shield-halved text-blue-400 text-lg"></i>
+                    </div>
+                </div>
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                        FixPilot
+                    </h1>
+                </div>
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/30 backdrop-blur-md">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+                    neatHack 2026
+                </span>
+            </div>
+            <p class="text-xs md:text-sm text-zinc-400 mt-2 font-normal">
+                Autonomous Self-Healing SRE & Code Remediator · <span class="italic text-zinc-300">"Build agents you’d trust to run without you watching."</span>
+            </p>
+        </div>
+
+        <!-- System Pill Badges (Aceternity Glass Style) -->
+        <div class="flex flex-wrap items-center gap-2.5">
+            <span class="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-zinc-900/80 border border-white/[0.08] backdrop-blur-md shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+                <span class="text-zinc-400">Guardrail: <strong class="text-zinc-200 font-medium">{{ status.guardrail_engine }}</strong></span>
+            </span>
+            <a href="{{ status.neatlogs_url }}" target="_blank" class="flex items-center gap-2 text-xs px-3.5 py-1.5 rounded-full bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 backdrop-blur-md shadow-sm transition hover:scale-[1.02]">
+                <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse shadow-[0_0_8px_#60a5fa]"></span>
+                <span>neatlogs: <strong class="text-white font-medium">Open Cloud Traces ↗</strong></span>
+            </a>
+            <span class="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-zinc-900/80 border border-white/[0.08] backdrop-blur-md shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc]"></span>
+                <span class="text-zinc-400">Entire: <strong class="text-zinc-200 font-medium">Checkpoints Active</strong></span>
+            </span>
+        </div>
+    </header>
+
+    <!-- Main Content Bento Grid -->
+    <main class="max-w-7xl mx-auto mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+        <!-- Left Column: Trigger Selection & Live Local Guardrail (5 Cols) -->
+        <div class="lg:col-span-5 space-y-6">
+
+            <!-- Incident Trigger Card -->
+            <div class="relative group bg-zinc-950/70 border border-white/[0.08] rounded-2xl p-6 backdrop-blur-xl shadow-2xl transition duration-300 hover:border-white/[0.15]">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                        <i class="fa-solid fa-bolt-lightning text-amber-400"></i> Incident Trigger Simulator
+                    </h2>
+                    <span class="text-[11px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">Production Event</span>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-400 mb-1.5">Preset Scenario</label>
+                        <select id="scenarioSelect" class="w-full bg-zinc-900/90 border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-xs md:text-sm text-zinc-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition">
+                            {% for s in scenarios %}
+                            <option value="{{ s.id }}" data-title="{{ s.title }}" data-desc="{{ s.description }}">{{ s.name }}</option>
+                            {% endfor %}
+                            <option value="custom">✍️ Custom Incident / Production Log Input</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-400 mb-1.5">Incident Title</label>
+                        <input id="incidentTitle" type="text" class="w-full bg-zinc-900/90 border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-xs md:text-sm text-zinc-200 focus:outline-none focus:border-blue-500 transition" value="{{ scenarios[0].title }}">
+                    </div>
+
+                    <div class="pt-2 flex items-center justify-between border-t border-white/[0.06]">
+                        <label class="flex items-center gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
+                            <input id="forceHealing" type="checkbox" checked class="w-4 h-4 rounded bg-zinc-900 border-zinc-700 text-blue-500 focus:ring-0 focus:ring-offset-0">
+                            <span class="font-medium">Showcase Meta-Agent Self-Healing Loop</span>
+                        </label>
+                        <span class="text-[11px] text-purple-400 font-mono"><i class="fa-solid fa-brain mr-1"></i>Auto-Correct</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Local AI Guardrail Live Redaction Box -->
+            <div class="relative group bg-zinc-950/70 border border-white/[0.08] rounded-2xl p-6 backdrop-blur-xl shadow-2xl transition duration-300 hover:border-white/[0.15]">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                        <i class="fa-solid fa-shield-virus text-emerald-400"></i> Local AI Guardrail Layer
+                    </h2>
+                    <span id="redactionBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-medium">
+                        Sanitizing on-device...
+                    </span>
+                </div>
+
+                <!-- Raw Log Terminal Window -->
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex items-center justify-between px-3.5 py-2 bg-zinc-900/90 border-t border-x border-white/[0.08] rounded-t-xl text-[11px] text-zinc-400 font-mono">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block"></span>
+                                <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block"></span>
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
+                                <span class="ml-2 text-zinc-500 font-sans">raw_incident_telemetry.log</span>
+                            </div>
+                            <span class="text-zinc-500">Local Only</span>
+                        </div>
+                        <textarea id="rawLogs" rows="6" class="w-full bg-zinc-950/90 border border-white/[0.08] rounded-b-xl p-3 text-xs text-zinc-300 font-mono focus:outline-none focus:border-blue-500 transition leading-relaxed">{{ scenarios[0].raw_logs }}</textarea>
+                    </div>
+
+                    <!-- Sanitized Output Preview -->
+                    <div>
+                        <div class="flex items-center justify-between px-3.5 py-2 bg-zinc-900/90 border-t border-x border-white/[0.08] rounded-t-xl text-[11px] text-zinc-400 font-mono">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2.5 h-2.5 rounded-full bg-blue-500/80 inline-block"></span>
+                                <span class="ml-2 text-zinc-500 font-sans">cloud_payload.json (Scrubbed)</span>
+                            </div>
+                            <span class="text-emerald-400 font-mono text-[10px]">Zero Leaks</span>
+                        </div>
+                        <div id="sanitizedPreview" class="bg-zinc-950/90 border border-white/[0.08] rounded-b-xl p-3 text-xs text-emerald-400/90 font-mono overflow-x-auto max-h-44 overflow-y-auto whitespace-pre-wrap leading-relaxed">Loading local sanitizer...</div>
+                    </div>
+                </div>
+
+                <!-- Aceternity Shimmer CTA Button -->
+                <div class="mt-6">
+                    <button id="runBtn" class="relative group/btn w-full overflow-hidden rounded-xl p-[1px] focus:outline-none transition active:scale-[0.99]">
+                        <span class="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#3b82f6_0%,#a855f7_50%,#3b82f6_100%)] opacity-80 group-hover/btn:opacity-100 transition-opacity"></span>
+                        <span class="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-xl bg-zinc-950 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-3xl hover:bg-zinc-900/90 transition-colors gap-2.5">
+                            <i class="fa-solid fa-play text-blue-400"></i>
+                            <span>Execute Autonomous Remediation</span>
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Swarm Execution Trace & Sponsor Showcase (7 Cols) -->
+        <div class="lg:col-span-7 space-y-6">
+
+            <!-- Execution Status Timeline Banner -->
+            <div class="bg-zinc-950/70 border border-white/[0.08] rounded-2xl p-6 backdrop-blur-xl shadow-2xl">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-white/[0.06] gap-3">
+                    <div class="flex items-center gap-3">
+                        <div id="statusPulse" class="w-3 h-3 rounded-full bg-zinc-600"></div>
+                        <h2 id="pipelineStatusText" class="text-base font-bold text-white tracking-tight">Ready to Remediate</h2>
+                    </div>
+                    <div id="telemetryBadge" class="hidden text-xs text-zinc-400 flex items-center gap-3 font-mono bg-zinc-900/60 px-3 py-1.5 rounded-lg border border-white/[0.06]">
+                        <span><i class="fa-solid fa-coins text-amber-400 mr-1"></i><strong id="tokenCount" class="text-white">0</strong> tokens</span>
+                        <span><i class="fa-solid fa-clock text-blue-400 mr-1"></i><strong id="timeElapsed" class="text-white">0</strong>s</span>
+                    </div>
+                </div>
+
+                <!-- Modern Step Progression Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 text-center">
+                    <div id="stepGuardrail" class="p-3 rounded-xl bg-zinc-900/60 border border-white/[0.06] transition duration-200">
+                        <div class="text-[10px] uppercase font-bold text-zinc-500 mb-1">Step 1</div>
+                        <div class="text-xs font-semibold text-zinc-300">Local Guardrail</div>
+                    </div>
+                    <div id="stepInvestigate" class="p-3 rounded-xl bg-zinc-900/60 border border-white/[0.06] transition duration-200">
+                        <div class="text-[10px] uppercase font-bold text-zinc-500 mb-1">Step 2</div>
+                        <div class="text-xs font-semibold text-zinc-300">Investigator</div>
+                    </div>
+                    <div id="stepFix" class="p-3 rounded-xl bg-zinc-900/60 border border-white/[0.06] transition duration-200">
+                        <div class="text-[10px] uppercase font-bold text-zinc-500 mb-1">Step 3</div>
+                        <div class="text-xs font-semibold text-zinc-300">Fixer & Entire CP</div>
+                    </div>
+                    <div id="stepVerify" class="p-3 rounded-xl bg-zinc-900/60 border border-white/[0.06] transition duration-200">
+                        <div class="text-[10px] uppercase font-bold text-zinc-500 mb-1">Step 4</div>
+                        <div class="text-xs font-semibold text-zinc-300">Self-Healing Verifier</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live neatlogs Streaming Banner (Aceternity Glass Style) -->
+            <div id="liveNeatlogsBanner" class="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-zinc-950 border border-blue-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                        <i class="fa-solid fa-chart-line text-sm"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs font-bold text-white tracking-tight flex items-center gap-2">
+                            <span>neatlogs Project: 9e96e683...</span>
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        </div>
+                        <p id="neatlogsStatusSubtitle" class="text-[11px] text-zinc-400">Connected & streaming live telemetry</p>
+                    </div>
+                </div>
+                <div id="neatlogsTraceLinks" class="flex flex-wrap items-center gap-2">
+                    <a href="https://app.neatlogs.com/traces?orgId=db3c0208-c262-4f7b-bf77-fd7c68b2c2b3&projectId=9e96e683-fdc1-41f9-90cf-bda9abf9b448" target="_blank" class="text-xs bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 font-semibold px-3 py-1.5 rounded-lg border border-blue-500/40 transition flex items-center gap-1.5">
+                        <span>Open Live Dashboard</span> <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Tabbed Detailed View (Aceternity Floating Tab Style) -->
+            <div class="bg-zinc-950/70 border border-white/[0.08] rounded-2xl overflow-hidden backdrop-blur-xl shadow-2xl">
+                <!-- Floating Tab Switcher -->
+                <div class="p-3 border-b border-white/[0.06] bg-zinc-900/40">
+                    <div class="flex flex-wrap gap-1.5 p-1 bg-zinc-950/80 rounded-xl border border-white/[0.06] text-xs font-medium">
+                        <button class="tab-btn flex-1 py-2 px-3 rounded-lg text-zinc-400 hover:text-white border border-transparent active" data-tab="tab-meta" id="btnTabMeta">
+                            <i class="fa-solid fa-brain text-purple-400 mr-1.5"></i> Meta-Agent Loop
+                        </button>
+                        <button class="tab-btn flex-1 py-2 px-3 rounded-lg text-zinc-400 hover:text-white border border-transparent relative" data-tab="tab-traces" id="btnTabTraces">
+                            <i class="fa-solid fa-chart-line text-blue-400 mr-1.5"></i> neatlogs Evidence
+                            <span id="tabTraceCount" class="ml-1.5 px-2 py-0.5 rounded-full text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 font-mono">2 Traces</span>
+                        </button>
+                        <button class="tab-btn flex-1 py-2 px-3 rounded-lg text-zinc-400 hover:text-white border border-transparent" data-tab="tab-pr" id="btnTabPr">
+                            <i class="fa-brands fa-github text-zinc-300 mr-1.5"></i> GitHub PR & Entire
+                        </button>
+                        <button class="tab-btn flex-1 py-2 px-3 rounded-lg text-zinc-400 hover:text-white border border-transparent" data-tab="tab-cfo" id="btnTabCfo">
+                            <i class="fa-solid fa-chart-pie text-emerald-400 mr-1.5"></i> cfo.ai Economics
+                        </button>
+                    </div>
+                </div>
+
+                <div class="p-6">
+                    <!-- Tab 1: Meta-Agent Closed Loop -->
+                    <div id="tab-meta" class="tab-content space-y-4">
+                        <div id="metaEmptyState" class="text-center py-12 text-zinc-500 text-sm">
+                            <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-zinc-900/80 border border-white/[0.06] flex items-center justify-center">
+                                <i class="fa-solid fa-network-wired text-xl text-zinc-400"></i>
+                            </div>
+                            <p class="font-medium text-zinc-400">Swarm Ready</p>
+                            <p class="text-xs text-zinc-600 mt-1">Click "Execute Autonomous Remediation" to stream the multi-agent closed loop.</p>
+                        </div>
+
+                        <div id="metaContent" class="hidden space-y-4">
+                            <!-- Quick Switch to neatlogs Evidence -->
+                            <div class="p-3.5 rounded-xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-zinc-950 border border-blue-500/30 flex items-center justify-between shadow-lg">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400">
+                                        <i class="fa-solid fa-chart-line text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs font-bold text-white flex items-center gap-2">
+                                            <span>neatlogs Execution Telemetry Captured</span>
+                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                        </div>
+                                        <div class="text-[11px] text-zinc-400">Run 1 (Failed: 401 Rejection) & Run 2 (Self-Corrected: 200 OK)</div>
+                                    </div>
+                                </div>
+                                <button type="button" onclick="switchToTab('tab-traces')" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition flex items-center gap-1.5 shadow-md">
+                                    <span>View neatlogs Evidence Tab</span> <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                                </button>
+                            </div>
+
+                            <!-- Investigator Card -->
+                            <div class="p-4 rounded-xl bg-zinc-900/60 border border-white/[0.06]">
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-blue-400 mb-1.5 flex items-center gap-2">
+                                    <i class="fa-solid fa-magnifying-glass"></i> Investigator Root Cause Diagnosis
+                                </h3>
+                                <p id="investigatorDiagnosis" class="text-xs md:text-sm text-zinc-200 leading-relaxed"></p>
+                                <div id="targetFilesBadge" class="mt-3 text-xs text-zinc-400 font-mono inline-block px-2.5 py-1 rounded-md bg-zinc-950 border border-white/[0.06]"></div>
+                            </div>
+
+                            <!-- Meta-Agent Trace Self-Correction Box -->
+                            <div id="metaCorrectionBox" class="p-5 rounded-xl bg-gradient-to-r from-purple-950/30 via-purple-900/20 to-zinc-950 border border-purple-500/40 shadow-lg">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex items-center gap-2 text-purple-300 font-bold text-xs uppercase tracking-wider">
+                                        <i class="fa-solid fa-brain animate-pulse"></i> Meta-Agent Self-Correction
+                                    </div>
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono">Read Own neatlogs Trace</span>
+                                </div>
+                                <div class="text-xs text-zinc-300 mt-2 leading-relaxed">
+                                    <strong class="text-purple-200">Failure Detected in Trace:</strong> <span id="metaReason"></span>
+                                </div>
+                                <div class="text-xs text-emerald-300 mt-2.5 p-3 rounded-lg bg-emerald-950/30 border border-emerald-500/30 font-mono leading-relaxed">
+                                    <strong>Remediation Guidance Fed to Fixer:</strong> <span id="metaGuidance"></span>
+                                </div>
+                            </div>
+
+                            <!-- Verifier Output Card -->
+                            <div class="p-4 rounded-xl bg-zinc-900/60 border border-white/[0.06]">
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-2 flex items-center gap-2">
+                                    <i class="fa-solid fa-circle-check"></i> Verifier Test Suite Execution
+                                </h3>
+                                <pre id="verifierLogs" class="text-xs text-zinc-300 font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed p-3 rounded-lg bg-zinc-950 border border-white/[0.04]"></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: neatlogs Trace Evidence -->
+                    <div id="tab-traces" class="tab-content hidden space-y-4">
+                        <div id="traceSummaryContainer" class="text-zinc-300 text-sm">
+                            <p class="text-zinc-500 py-12 text-center text-xs">Run remediation to generate the required Before vs. After trace comparison card.</p>
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: GitHub PR & Entire Checkpoint -->
+                    <div id="tab-pr" class="tab-content hidden space-y-4">
+                        <div id="prContainer" class="space-y-3">
+                            <p class="text-zinc-500 py-12 text-center text-xs">No Pull Request created yet.</p>
+                        </div>
+                    </div>
+
+                    <!-- Tab 4: cfo.ai Unit Economics -->
+                    <div id="tab-cfo" class="tab-content hidden space-y-6">
+                        <div>
+                            <h3 class="text-sm font-bold text-white tracking-tight">cfo.ai SaaS Unit Economics Calculator</h3>
+                            <p class="text-xs text-zinc-400 mt-1">Modeled using standard cfo.ai SaaS financial formulas for autonomous agents vs. human SRE on-call teams.</p>
+                        </div>
+
+                        <!-- Sliders -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="p-4 rounded-xl bg-zinc-900/60 border border-white/[0.06]">
+                                <label class="block text-xs font-medium text-zinc-400 mb-2">Monthly Incidents: <strong id="incidentsLabel" class="text-blue-400 font-mono">500</strong></label>
+                                <input id="incidentsSlider" type="range" min="50" max="2000" step="50" value="500" class="w-full accent-blue-500">
+                            </div>
+                            <div class="p-4 rounded-xl bg-zinc-900/60 border border-white/[0.06]">
+                                <label class="block text-xs font-medium text-zinc-400 mb-2">SRE Hourly Rate: <strong id="rateLabel" class="text-emerald-400 font-mono">$100/hr</strong></label>
+                                <input id="rateSlider" type="range" min="50" max="250" step="10" value="100" class="w-full accent-emerald-500">
+                            </div>
+                        </div>
+
+                        <!-- Bento KPI Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                            <div class="p-5 rounded-xl bg-gradient-to-b from-blue-950/20 to-zinc-900/60 border border-blue-500/20">
+                                <div class="text-xs text-zinc-400 font-medium">Monthly AI Agent Cost</div>
+                                <div id="cfoAiCost" class="text-2xl font-extrabold text-blue-400 mt-2 font-mono">$14.00</div>
+                                <div class="text-[11px] text-zinc-500 mt-1">at $0.028 / autonomous fix</div>
+                            </div>
+                            <div class="p-5 rounded-xl bg-gradient-to-b from-rose-950/20 to-zinc-900/60 border border-rose-500/20">
+                                <div class="text-xs text-zinc-400 font-medium">Human On-Call Triage Cost</div>
+                                <div id="cfoHumanCost" class="text-2xl font-extrabold text-rose-400 mt-2 font-mono">$37,500.00</div>
+                                <div class="text-[11px] text-zinc-500 mt-1">45 min engineer triage equiv.</div>
+                            </div>
+                            <div class="p-5 rounded-xl bg-gradient-to-b from-emerald-950/20 to-zinc-900/60 border border-emerald-500/20">
+                                <div class="text-xs text-zinc-400 font-medium">Net Monthly Savings</div>
+                                <div id="cfoSavings" class="text-2xl font-extrabold text-emerald-400 mt-2 font-mono">$37,486.00</div>
+                                <div id="cfoMargin" class="text-[11px] text-emerald-400 font-semibold mt-1">+88.2% Gross Margin</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Client-side Logic -->
+    <script>
+        const scenarioPresets = {{ scenarios | tojson }};
+
+        // DOM elements
+        const scenarioSelect = document.getElementById('scenarioSelect');
+        const incidentTitle = document.getElementById('incidentTitle');
+        const rawLogs = document.getElementById('rawLogs');
+        const sanitizedPreview = document.getElementById('sanitizedPreview');
+        const redactionBadge = document.getElementById('redactionBadge');
+        const runBtn = document.getElementById('runBtn');
+
+        // Tab switcher helper
+        function switchToTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            const btn = document.querySelector(`[data-tab="${tabId}"]`);
+            if (btn) btn.classList.add('active');
+            const target = document.getElementById(tabId);
+            if (target) target.classList.remove('hidden');
+        }
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                switchToTab(btn.getAttribute('data-tab'));
+            });
+        });
+
+        // Scenario switcher
+        scenarioSelect.addEventListener('change', (e) => {
+            const found = scenarioPresets.find(s => s.id === e.target.value);
+            if (found) {
+                incidentTitle.value = found.title;
+                rawLogs.value = found.raw_logs;
+                triggerSanitizePreview();
+            }
+        });
+
+        rawLogs.addEventListener('input', triggerSanitizePreview);
+
+        async function triggerSanitizePreview() {
+            try {
+                const res = await fetch('/api/preview-sanitize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ raw_logs: rawLogs.value })
+                });
+                const data = await res.json();
+                sanitizedPreview.innerText = data.sanitized_text;
+                redactionBadge.innerText = `🛡️ Redacted ${data.redactions_count} Secret(s) Locally`;
+            } catch (err) {}
+        }
+        triggerSanitizePreview();
+
+        // Populate Dashboard UI
+        function populateDashboard(data) {
+            if (!data) return;
+
+            const statusPulse = document.getElementById('statusPulse');
+            const statusText = document.getElementById('pipelineStatusText');
+            statusPulse.className = "w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]";
+            statusText.innerText = "Remediation Verified & PR Ready (100% Passed)";
+
+            document.getElementById('stepInvestigate').className = "p-3 rounded-xl bg-blue-950/40 border border-blue-500/60 text-blue-300 shadow-[0_0_15px_rgba(59,130,246,0.15)]";
+            document.getElementById('stepFix').className = "p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/60 text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.15)]";
+            document.getElementById('stepVerify').className = "p-3 rounded-xl bg-purple-950/40 border border-purple-500/60 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.15)]";
+
+            if (data.telemetry) {
+                document.getElementById('telemetryBadge').classList.remove('hidden');
+                document.getElementById('tokenCount').innerText = data.telemetry.total_tokens || 0;
+                document.getElementById('timeElapsed').innerText = data.telemetry.duration_s || 0;
+            }
+
+            // Populate Meta Tab
+            document.getElementById('metaEmptyState').classList.add('hidden');
+            document.getElementById('metaContent').classList.remove('hidden');
+            if (data.investigation) {
+                document.getElementById('investigatorDiagnosis').innerText = data.investigation.root_cause || '';
+                document.getElementById('targetFilesBadge').innerText = "Target Files: " + (data.investigation.target_files || []).join(', ');
+            }
+
+            if (data.meta_agent) {
+                document.getElementById('metaCorrectionBox').classList.remove('hidden');
+                document.getElementById('metaReason').innerText = data.meta_agent.cause || '';
+                document.getElementById('metaGuidance').innerText = data.meta_agent.instructions || '';
+            } else {
+                document.getElementById('metaCorrectionBox').classList.add('hidden');
+            }
+
+            if (data.verification) {
+                document.getElementById('verifierLogs').innerText = data.verification.logs || '';
+            }
+
+            // Update live neatlogs banner
+            if (data.traces && data.traces.initial_run && data.traces.corrected_run) {
+                document.getElementById('neatlogsStatusSubtitle').innerHTML = `
+                    Recorded 2 runs: <span class="text-rose-400 font-mono">Failed (#${data.traces.initial_run.id})</span> & 
+                    <span class="text-emerald-400 font-mono">Self-Corrected (#${data.traces.corrected_run.id})</span>
+                `;
+                document.getElementById('neatlogsTraceLinks').innerHTML = `
+                    <a href="${data.traces.initial_run.url}" target="_blank" class="text-xs bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-semibold px-3 py-1.5 rounded-lg border border-rose-500/30 transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-xmark text-rose-400"></i> Failed Trace ↗
+                    </a>
+                    <a href="${data.traces.corrected_run.url}" target="_blank" class="text-xs bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 font-semibold px-3 py-1.5 rounded-lg border border-emerald-500/30 transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-check text-emerald-400"></i> Corrected Trace ↗
+                    </a>
+                    <a href="${data.traces.dashboard_url}" target="_blank" class="text-xs bg-blue-600 hover:bg-blue-500 text-white font-semibold px-3 py-1.5 rounded-lg shadow-md transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-chart-line"></i> Dashboard ↗
+                    </a>
+                `;
+            }
+
+            // Populate Traces Tab with Visual Span Trees
+            if (data.traces) {
+                const r1 = data.traces.initial_run;
+                const r2 = data.traces.corrected_run;
+
+                function renderSpanSection(runObj, title, isFailed) {
+                    if (!runObj || !runObj.spans || runObj.spans.length === 0) return '';
+                    const borderGlow = isFailed ? 'border-rose-500/30 bg-rose-950/10' : 'border-emerald-500/30 bg-emerald-950/10';
+                    const badgeColor = isFailed ? 'text-rose-400 border-rose-500/40 bg-rose-500/10' : 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10';
+                    const statusText = isFailed ? 'Initial Run: Failed (CI 401 Rejection)' : 'Self-Corrected Run: 100% Passed';
+
+                    return `
+                        <div class="rounded-xl border ${borderGlow} p-4 space-y-3">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-white/[0.06] gap-2">
+                                <div class="flex items-center gap-2.5">
+                                    <span class="w-2.5 h-2.5 rounded-full ${isFailed ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e]' : 'bg-emerald-400 shadow-[0_0_8px_#34d399]'}"></span>
+                                    <span class="text-xs font-bold text-white uppercase tracking-wider">${title} (#${runObj.id})</span>
+                                </div>
+                                <div class="flex items-center gap-2.5">
+                                    <span class="text-[10px] px-2 py-0.5 rounded font-mono border ${badgeColor}">${statusText}</span>
+                                    <a href="${runObj.url}" target="_blank" class="text-xs px-2.5 py-1 rounded-md bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 transition flex items-center gap-1 font-mono">
+                                        <span>Inspect in neatlogs</span> <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="space-y-1.5">
+                                ${runObj.spans.map(s => `
+                                    <div class="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-lg bg-zinc-950/80 border border-white/[0.04] text-xs font-mono gap-2 hover:border-white/[0.1] transition">
+                                        <div class="flex items-center gap-2.5">
+                                            <span class="w-2 h-2 rounded-full ${s.status === 'error' ? 'bg-rose-500 animate-pulse' : 'bg-emerald-400'}"></span>
+                                            <span class="px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">${s.kind}</span>
+                                            <span class="text-zinc-200 font-medium font-sans">${s.name}</span>
+                                        </div>
+                                        <div class="flex items-center gap-3 text-zinc-400 text-[11px]">
+                                            <span>${s.duration_ms}ms</span>
+                                            <span>${s.tokens} tok</span>
+                                            <span class="${s.status === 'error' ? 'text-rose-400 font-bold bg-rose-500/15 px-2 py-0.5 rounded border border-rose-500/30' : 'text-emerald-400 font-semibold bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30'}">${s.status.toUpperCase()}</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                document.getElementById('traceSummaryContainer').innerHTML = `
+                    <!-- Direct Dashboard Actions -->
+                    <div class="flex flex-wrap items-center justify-between p-4 bg-zinc-900/80 rounded-xl border border-white/[0.08] gap-3">
+                        <div>
+                            <div class="text-xs font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-chart-line text-blue-400"></i>
+                                <span>Live neatlogs Traces Captured</span>
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            </div>
+                            <div class="text-[11px] text-zinc-400 mt-0.5 font-mono">Project ID: 9e96e683-fdc1-41f9-90cf-bda9abf9b448</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <a href="${data.traces.dashboard_url}" target="_blank" class="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-chart-line"></i> Open in neatlogs.com ↗
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Run 1: Failed Attempt -->
+                    ${renderSpanSection(r1, 'Trace 1: Initial Run', true)}
+
+                    <!-- Run 2: Self-Corrected Attempt -->
+                    ${renderSpanSection(r2, 'Trace 2: Self-Corrected Run', false)}
+
+                    <!-- Markdown Trace Diff Card -->
+                    <div class="p-4 bg-zinc-950 rounded-xl border border-white/[0.08] overflow-x-auto text-xs font-mono">
+                        <div class="text-[11px] uppercase font-bold text-zinc-400 mb-2">Before vs. After neatlogs Trace Comparison</div>
+                        <pre class="text-zinc-300 whitespace-pre-wrap leading-relaxed">${data.trace_diff ? data.trace_diff.markdown : ''}</pre>
+                    </div>
+                `;
+            }
+
+            // Populate PR Tab
+            if (data.pull_request) {
+                document.getElementById('prContainer').innerHTML = `
+                    <div class="p-4 bg-zinc-900/80 border border-white/[0.08] rounded-xl flex items-center justify-between shadow-lg">
+                        <div>
+                            <span class="text-[11px] uppercase font-bold text-zinc-500">Generated Pull Request:</span>
+                            <div class="text-sm font-semibold text-white tracking-tight mt-0.5">${data.pull_request.title}</div>
+                        </div>
+                        <a href="${data.pull_request.url}" target="_blank" class="text-xs bg-zinc-800 hover:bg-zinc-700 px-3.5 py-1.5 rounded-lg border border-white/[0.1] text-blue-400 font-medium transition">Open PR ↗</a>
+                    </div>
+                    <pre class="p-4 rounded-xl bg-zinc-950 border border-white/[0.08] text-xs text-zinc-300 font-mono whitespace-pre-wrap max-h-96 overflow-y-auto leading-relaxed">${data.pull_request.body}</pre>
+                `;
+            }
+        }
+
+        // Run Remediation
+        runBtn.addEventListener('click', async () => {
+            runBtn.disabled = true;
+            runBtn.innerHTML = '<span class="inline-flex h-full w-full items-center justify-center rounded-xl bg-zinc-950 px-6 py-3.5 text-sm font-semibold text-white gap-2.5"><i class="fa-solid fa-circle-notch fa-spin text-blue-400"></i> Autonomous Swarm Remediating...</span>';
+
+            const statusPulse = document.getElementById('statusPulse');
+            const statusText = document.getElementById('pipelineStatusText');
+            statusPulse.className = "w-3 h-3 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_#fbbf24]";
+            statusText.innerText = "1/4 Local Guardrail Sanitizing Secrets...";
+
+            document.getElementById('stepGuardrail').className = "p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/60 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.15)]";
+
+            const s2 = setTimeout(() => {
+                statusText.innerText = "2/4 Investigator Diagnosing Root Cause...";
+                document.getElementById('stepInvestigate').className = "p-3 rounded-xl bg-blue-950/40 border border-blue-500/60 text-blue-300 shadow-[0_0_15px_rgba(59,130,246,0.15)]";
+            }, 800);
+
+            const s3 = setTimeout(() => {
+                statusText.innerText = "3/4 Fixer Agent & Entire Checkpoint...";
+                document.getElementById('stepFix').className = "p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/60 text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.15)]";
+            }, 1800);
+
+            const s4 = setTimeout(() => {
+                statusText.innerText = "4/4 Verifier & Meta-Agent Self-Healing Loop...";
+                document.getElementById('stepVerify').className = "p-3 rounded-xl bg-purple-950/40 border border-purple-500/60 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.15)]";
+            }, 2700);
+
+            try {
+                const res = await fetch('/api/run-remediation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        incident_title: incidentTitle.value,
+                        raw_logs: rawLogs.value,
+                        force_self_healing: document.getElementById('forceHealing').checked
+                    })
+                });
+                const data = await res.json();
+                clearTimeout(s2);
+                clearTimeout(s3);
+                clearTimeout(s4);
+                populateDashboard(data);
+                switchToTab('tab-meta');
+            } catch (err) {
+                clearTimeout(s2);
+                clearTimeout(s3);
+                clearTimeout(s4);
+                statusText.innerText = "Execution failed: " + err.message;
+            } finally {
+                runBtn.disabled = false;
+                runBtn.innerHTML = '<span class="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#3b82f6_0%,#a855f7_50%,#3b82f6_100%)] opacity-80 group-hover/btn:opacity-100 transition-opacity"></span><span class="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-xl bg-zinc-950 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-3xl hover:bg-zinc-900/90 transition-colors gap-2.5"><i class="fa-solid fa-play text-blue-400"></i><span>Execute Autonomous Remediation</span></span>';
+            }
+        });
+
+        // Initialize dashboard with cached run if available (unless ?clean=true)
+        const urlParams = new URLSearchParams(window.location.search);
+        const isClean = urlParams.get('clean') === 'true';
+        const initialData = isClean ? null : ({{ initial_result | tojson if initial_result else 'null' }});
+        if (initialData) {
+            populateDashboard(initialData);
+        }
+
+        // cfo.ai Calculator Sliders
+        const incidentsSlider = document.getElementById('incidentsSlider');
+        const rateSlider = document.getElementById('rateSlider');
+        function updateCfoCalculator() {
+            const count = parseInt(incidentsSlider.value);
+            const rate = parseInt(rateSlider.value);
+            document.getElementById('incidentsLabel').innerText = count;
+            document.getElementById('rateLabel').innerText = `$${rate}/hr`;
+
+            const aiCost = count * 0.028;
+            const humanCost = count * (45 / 60) * rate;
+            const savings = humanCost - aiCost;
+            const margin = ((savings / humanCost) * 100).toFixed(1);
+
+            document.getElementById('cfoAiCost').innerText = `$${aiCost.toFixed(2)}`;
+            document.getElementById('cfoHumanCost').innerText = `$${humanCost.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            document.getElementById('cfoSavings').innerText = `$${savings.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            document.getElementById('cfoMargin').innerText = `+${margin}% Margin`;
+        }
+        incidentsSlider.addEventListener('input', updateCfoCalculator);
+        rateSlider.addEventListener('input', updateCfoCalculator);
+        updateCfoCalculator();
+    </script>
+</body>
+</html>

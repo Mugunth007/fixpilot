@@ -1,0 +1,25 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+models/
+*.gguf
+.DS_Store
+*.log
+
+# Kaggle competition workspace files
+llm_classification_finetuning/
+generate_081_notebook.py
+generate_notebook.py
+generate_standalone_notebook.py
+
+# Video build intermediates (keep root FixPilot_Demo_Walkthrough.mp4)
+demo_generation/raw_video/
+demo_generation/audio/
+demo_generation/*.mp3
+demo_generation/FixPilot_Official_Demo.mp4
